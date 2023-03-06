@@ -1,0 +1,72 @@
+version: "3"
+services:
+  app:
+    image: java_application
+    container_name: java_application
+    restart: always
+    ports:
+      - "8090:8090"
+    logging:
+      driver: fluentd
+    networks:
+      - local
+  nginx:
+    depends_on:
+      - fluent-bit
+    image: nginx-march2-42
+    restart: always
+    container_name: nginx
+    ports:
+      - "8085:8085"
+    logging:
+      driver: fluentd
+    networks:
+      - local
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.2
+    container_name: es01
+    environment:
+      - discovery.type=single-node
+    networks:
+      - local
+    ports:
+      - 9200:9200
+  kibana:
+    container_name: kibana
+    image: docker.elastic.co/kibana/kibana:7.17.2
+    environment: 
+      - ELASTICSEARCH_HOSTS=http://es01:9200
+    networks:
+      - local
+    ports:
+      - 5601:5601
+    depends_on:
+      - elasticsearch
+      - fluent-bit
+  fluent-bit:
+    # image: fluent/fluent-bit:1.8
+    image: fluent/fluent-bit:1.9
+    container_name: fluent-bit
+    command:
+      - /fluent-bit/bin/fluent-bit
+      - --config=/etc/fluent-bit/fluent-bit.conf
+    environment:
+      - FLB_ES_HOST=elasticsearch
+      - FLB_ES_PORT=9200
+    ports:
+      - 24224:24224
+      - 24224:24224/udp
+
+    volumes:
+      - ./conf/:/etc/fluent-bit/:ro
+      - ./conf:/var/log/nginx
+    networks:
+      - local
+    
+# volumes:
+#   mysql: {}
+
+networks:
+  local:
+    driver: bridge
